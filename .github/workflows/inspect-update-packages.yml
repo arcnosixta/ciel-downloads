@@ -24,12 +24,17 @@ jobs:
         run: |
           gh release download v1.0.14 --repo "$GITHUB_REPOSITORY" --pattern Ciel-Connector-linux-${{ matrix.image }}.AppImage --pattern Ciel-Connector-linux-${{ matrix.deb }}.deb
           chmod +x Ciel-Connector-linux-${{ matrix.image }}.AppImage
+          ./Ciel-Connector-linux-${{ matrix.image }}.AppImage --appimage-extract 'resources/app-update.yml'
+          test -s squashfs-root/resources/app-update.yml
           ./Ciel-Connector-linux-${{ matrix.image }}.AppImage --appimage-extract 'resources/package-type'
           if test -f squashfs-root/resources/package-type; then
             echo 'AppImage package-type:'
             cat squashfs-root/resources/package-type
+            exit 1
           else
             echo 'AppImage package-type absent: default AppImageUpdater'
           fi
           echo 'DEB package-type:'
-          dpkg-deb --fsys-tarfile Ciel-Connector-linux-${{ matrix.deb }}.deb | tar -xOf - './opt/Ciel Connector/resources/package-type'
+          dpkg-deb --fsys-tarfile Ciel-Connector-linux-${{ matrix.deb }}.deb | tar -xOf - './opt/Ciel Connector/resources/package-type' > deb-type.txt
+          test "$(cat deb-type.txt)" = deb
+          cat deb-type.txt
