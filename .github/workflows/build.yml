@@ -55,6 +55,9 @@ jobs:
         with:
           node-version: 22
           architecture: ${{ matrix.arch }}
+      - name: Prefer Windows bsdtar over Git Bash GNU tar for ZIP toolchains
+        if: matrix.target == 'win'
+        run: node -e "require('node:fs').appendFileSync(process.env.GITHUB_PATH, process.env.SystemRoot + '/System32\n')"
       - name: Verify native architecture and release inputs
         env:
           CIEL_NATIVE_ARCH: ${{ matrix.arch }}
