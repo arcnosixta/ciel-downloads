@@ -18,10 +18,14 @@ on:
       key_secret:
         required: true
         type: string
+      targets:
+        type: choice
+        default: all
+        options: [all, windows]
 permissions:
   contents: read
 concurrency:
-  group: connector-${{ inputs.version }}
+  group: connector-${{ inputs.version }}-${{ inputs.targets || 'all' }}
   cancel-in-progress: false
 jobs:
   build:
@@ -31,13 +35,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: ubuntu-24.04, target: linux, arch: x64 }
-          - { os: ubuntu-24.04-arm, target: linux, arch: arm64 }
-          - { os: windows-latest, target: win, arch: x64 }
-          - { os: windows-11-arm, target: win, arch: arm64 }
-          - { os: macos-15-intel, target: mac, arch: x64 }
-          - { os: macos-15, target: mac, arch: arm64 }
+        include: >-
+          ${{ fromJSON(inputs.targets == 'windows' &&
+          '[{"os":"windows-latest","target":"win","arch":"x64"},{"os":"windows-11-arm","target":"win","arch":"arm64"}]' ||
+          '[{"os":"ubuntu-24.04","target":"linux","arch":"x64"},{"os":"ubuntu-24.04-arm","target":"linux","arch":"arm64"},{"os":"windows-latest","target":"win","arch":"x64"},{"os":"windows-11-arm","target":"win","arch":"arm64"},{"os":"macos-15-intel","target":"mac","arch":"x64"},{"os":"macos-15","target":"mac","arch":"arm64"}]') }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -55,9 +56,6 @@ jobs:
         with:
           node-version: 22
           architecture: ${{ matrix.arch }}
-      - name: Prefer Windows bsdtar over Git Bash GNU tar for ZIP toolchains
-        if: matrix.target == 'win'
-        run: node -e "require('node:fs').appendFileSync(process.env.GITHUB_PATH, process.env.SystemRoot + '/System32\n')"
       - name: Verify native architecture and release inputs
         env:
           CIEL_NATIVE_ARCH: ${{ matrix.arch }}
