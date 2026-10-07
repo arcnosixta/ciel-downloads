@@ -2,7 +2,7 @@ name: Inspect native Linux update package types
 on:
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   inspect:
     timeout-minutes: 10
