@@ -93,7 +93,13 @@ jobs:
         working-directory: _build/source
       - run: npm ci
         working-directory: _build/source/connector
+      - name: Prepare Windows runtime with native ZIP support
+        if: matrix.target == 'win'
+        shell: pwsh
+        run: npm.cmd run prepare:runtime
+        working-directory: _build/source/connector
       - run: npm run prepare:runtime
+        if: matrix.target != 'win'
         working-directory: _build/source/connector
       - run: node connector/smoke-agent-tools.mjs
         working-directory: _build/source
