@@ -21,7 +21,7 @@ on:
       targets:
         type: choice
         default: all
-        options: [all, windows]
+        options: [all, windows, mac-intel]
 permissions:
   contents: read
 concurrency:
@@ -36,7 +36,8 @@ jobs:
       fail-fast: false
       matrix:
         include: >-
-          ${{ fromJSON(inputs.targets == 'windows' &&
+          ${{ fromJSON(inputs.targets == 'mac-intel' &&
+          '[{"os":"macos-15-intel","target":"mac","arch":"x64"}]' || inputs.targets == 'windows' &&
           '[{"os":"windows-latest","target":"win","arch":"x64"},{"os":"windows-11-arm","target":"win","arch":"arm64"}]' ||
           '[{"os":"ubuntu-24.04","target":"linux","arch":"x64"},{"os":"ubuntu-24.04-arm","target":"linux","arch":"arm64"},{"os":"windows-latest","target":"win","arch":"x64"},{"os":"windows-11-arm","target":"win","arch":"arm64"},{"os":"macos-15-intel","target":"mac","arch":"x64"},{"os":"macos-15","target":"mac","arch":"arm64"}]') }}
     runs-on: ${{ matrix.os }}
