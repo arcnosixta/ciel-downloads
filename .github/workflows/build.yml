@@ -119,7 +119,9 @@ jobs:
         run: gh release download v1.0.13 --repo "$GITHUB_REPOSITORY" --pattern Ciel-Connector-win-${{ matrix.arch }}.exe --dir _build/previous
       - name: Verify Windows installation, legacy upgrades and uninstall
         if: matrix.target == 'win'
-        run: node connector/smoke-windows-installer.mjs ../previous/Ciel-Connector-win-${{ matrix.arch }}.exe
+        run: |
+          cp "$GITHUB_WORKSPACE/scripts/smoke-windows-installer.mjs" connector/smoke-windows-installer.mjs
+          node connector/smoke-windows-installer.mjs ../previous/Ciel-Connector-win-${{ matrix.arch }}.exe
         working-directory: _build/source
       - run: node connector/prepare-updates.mjs
         working-directory: _build/source
