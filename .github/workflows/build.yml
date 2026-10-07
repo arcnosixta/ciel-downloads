@@ -1,0 +1,123 @@
+name: Build verified Ciel Connector
+run-name: Connector ${{ inputs.version }} (${{ inputs.source_sha }})
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+        type: string
+      source_sha:
+        required: true
+        type: string
+      input_sha256:
+        required: true
+        type: string
+      release_id:
+        required: true
+        type: string
+      key_secret:
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: connector-${{ inputs.version }}
+  cancel-in-progress: false
+jobs:
+  build:
+    permissions:
+      contents: write
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, target: linux, arch: x64 }
+          - { os: ubuntu-24.04-arm, target: linux, arch: arm64 }
+          - { os: windows-latest, target: win, arch: x64 }
+          - { os: windows-11-arm, target: win, arch: arm64 }
+          - { os: macos-15-intel, target: mac, arch: x64 }
+          - { os: macos-15, target: mac, arch: arm64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      CIEL_BUILD_VERSION: ${{ inputs.version }}
+      CIEL_SOURCE_SHA: ${{ inputs.source_sha }}
+      CIEL_INPUT_SHA256: ${{ inputs.input_sha256 }}
+      CIEL_PUBLIC_RELEASE_ID: ${{ inputs.release_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          architecture: ${{ matrix.arch }}
+      - name: Verify native architecture and release inputs
+        env:
+          CIEL_NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          node <<'JS'
+          const assert = require('node:assert/strict'), fs = require('node:fs');
+          assert.equal(process.arch, process.env.CIEL_NATIVE_ARCH);
+          assert.match(process.env.CIEL_BUILD_VERSION, /^\d+\.\d+\.\d+$/);
+          assert.match(process.env.CIEL_SOURCE_SHA, /^[a-f0-9]{40}$/);
+          assert.match(process.env.CIEL_PUBLIC_RELEASE_ID, /^\d+$/);
+          fs.mkdirSync('_build/source', { recursive: true });
+          JS
+      - name: Download encrypted source from the unpublished release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "v$CIEL_BUILD_VERSION" --repo "$GITHUB_REPOSITORY" --pattern build-input.enc.json --dir _build
+      - name: Authenticate and unpack build input
+        env:
+          CIEL_BUILD_INPUT_KEY: ${{ secrets[inputs.key_secret] }}
+        run: |
+          node scripts/build-input.cjs _build/build-input.enc.json _build/source.tar.gz
+          tar -xzf _build/source.tar.gz -C _build/source
+          node -e "require('node:assert/strict').equal(require('./_build/source/connector/package.json').version, process.env.CIEL_BUILD_VERSION)"
+      - run: npm ci
+        working-directory: _build/source
+      - run: npm run lint
+        working-directory: _build/source
+      - run: npm run typecheck
+        working-directory: _build/source
+      - run: npm test
+        working-directory: _build/source
+      - run: npm run build
+        working-directory: _build/source
+      - run: npm ci
+        working-directory: _build/source/connector
+      - run: npm run prepare:runtime
+        working-directory: _build/source/connector
+      - run: node connector/smoke-agent-tools.mjs
+        working-directory: _build/source
+      - run: npm run test:runtime
+        working-directory: _build/source/connector
+      - run: npm run dist -- --${{ matrix.target }} --${{ matrix.arch }}
+        working-directory: _build/source/connector
+      - name: Verify packaged runtime and updater on the target machine
+        run: node connector/smoke-packaged.mjs ${{ matrix.target == 'win' && '--unpacked' || '' }}
+        working-directory: _build/source
+      - name: Verify Windows installer scope selection
+        if: matrix.target == 'win'
+        run: node --test test/installerScope.test.js
+        working-directory: _build/source
+      - name: Download the legacy Windows installer for upgrade tests
+        if: matrix.target == 'win'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download v1.0.13 --repo "$GITHUB_REPOSITORY" --pattern Ciel-Connector-win-${{ matrix.arch }}.exe --dir _build/previous
+      - name: Verify Windows installation, legacy upgrades and uninstall
+        if: matrix.target == 'win'
+        run: node connector/smoke-windows-installer.mjs ../previous/Ciel-Connector-win-${{ matrix.arch }}.exe
+        working-directory: _build/source
+      - run: node connector/prepare-updates.mjs
+        working-directory: _build/source
+      - name: Upload only verified installers and architecture-specific update feeds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node connector/upload-public-build.mjs
+        working-directory: _build/source
