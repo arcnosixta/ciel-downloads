@@ -43,7 +43,7 @@ const run = async (file, args) => {
   console.log(`Starting ${basename(file)}: ${args.join(' ')}`)
   const timer = setInterval(() => console.log(`Waiting for ${basename(file)}: ${Math.round((Date.now() - started) / 1000)}s`), 30000)
   try {
-    await execute(file, args, { windowsHide: true, windowsVerbatimArguments: true, timeout: 600000, maxBuffer: 1024 * 1024 })
+    await execute(file, args, { windowsHide: true, windowsVerbatimArguments: true, timeout: 1200000, maxBuffer: 1024 * 1024 })
     console.log(`Finished ${basename(file)}: ${Math.round((Date.now() - started) / 1000)}s`)
   } finally { clearInterval(timer) }
 }
