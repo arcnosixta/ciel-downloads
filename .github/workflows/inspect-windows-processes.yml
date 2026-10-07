@@ -31,7 +31,7 @@ jobs:
             "Write-Output (Get-CimInstance -ClassName Win32_Process).Count"
           ]){const file=join(process.env.WINDIR,directory,'WindowsPowerShell/v1.0/powershell.exe'),start=Date.now();
             console.log('Checking '+directory+': '+command);
-            try{const r=await promisify(execFile)(file,['-C',command],{windowsHide:true,timeout:60000,maxBuffer:4096});console.log(JSON.stringify({directory,elapsed:Date.now()-start,stdout:r.stdout,stderr:r.stderr}));}
+            try{const r=await promisify(execFile)(file,['-NoProfile','-NonInteractive','-C',command],{windowsHide:true,timeout:20000,maxBuffer:4096});console.log(JSON.stringify({directory,elapsed:Date.now()-start,stdout:r.stdout,stderr:r.stderr}));}
             catch(e){console.log(JSON.stringify({directory,elapsed:Date.now()-start,error:e.message,stdout:e.stdout,stderr:e.stderr}));}
           }})();
           JS
