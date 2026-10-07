@@ -81,6 +81,8 @@ jobs:
           node -e "require('node:assert/strict').equal(require('./_build/source/connector/package.json').version, process.env.CIEL_BUILD_VERSION)"
       - run: npm ci
         working-directory: _build/source
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: _build/source/server/capabilities
       - run: npm run lint
         working-directory: _build/source
       - run: npm run typecheck
