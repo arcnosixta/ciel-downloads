@@ -1,0 +1,40 @@
+name: Inspect native Linux update package types
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  inspect:
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            image: x86_64
+            deb: amd64
+          - os: ubuntu-24.04-arm
+            image: arm64
+            deb: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Inspect the actual updater identity in both native installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v1.0.15 --repo "$GITHUB_REPOSITORY" --pattern Ciel-Connector-linux-${{ matrix.image }}.AppImage --pattern Ciel-Connector-linux-${{ matrix.deb }}.deb
+          chmod +x Ciel-Connector-linux-${{ matrix.image }}.AppImage
+          ./Ciel-Connector-linux-${{ matrix.image }}.AppImage --appimage-extract 'resources/app-update.yml'
+          test -s squashfs-root/resources/app-update.yml
+          ./Ciel-Connector-linux-${{ matrix.image }}.AppImage --appimage-extract 'resources/package-type'
+          if test -f squashfs-root/resources/package-type; then
+            echo 'AppImage package-type:'
+            cat squashfs-root/resources/package-type
+            exit 1
+          else
+            echo 'AppImage package-type absent: default AppImageUpdater'
+          fi
+          echo 'DEB package-type:'
+          dpkg-deb --fsys-tarfile Ciel-Connector-linux-${{ matrix.deb }}.deb | tar -xOf - './opt/Ciel Connector/resources/package-type' > deb-type.txt
+          test "$(cat deb-type.txt)" = deb
+          cat deb-type.txt
