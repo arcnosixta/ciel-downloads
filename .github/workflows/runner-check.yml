@@ -1,0 +1,16 @@
+name: Check native Connector build runners
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  availability:
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check native operating system and architecture
+        run: node -e "console.log(JSON.stringify({platform:process.platform,arch:process.arch,node:process.version}))"
