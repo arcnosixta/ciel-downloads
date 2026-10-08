@@ -84,6 +84,8 @@ jobs:
         working-directory: _build/source
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: _build/source/server/capabilities
+      - run: npm ci
+        working-directory: _build/source/connector
       - run: npm run lint
         working-directory: _build/source
       - run: npm run typecheck
@@ -92,8 +94,6 @@ jobs:
         working-directory: _build/source
       - run: npm run build
         working-directory: _build/source
-      - run: npm ci
-        working-directory: _build/source/connector
       - name: Prepare Windows runtime with native ZIP support
         if: matrix.target == 'win'
         shell: pwsh
