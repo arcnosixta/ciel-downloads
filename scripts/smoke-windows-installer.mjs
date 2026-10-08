@@ -30,8 +30,12 @@ const installer = resolve(`connector/dist/Ciel-Connector-win-${process.arch}.exe
 const legacy = resolve(process.argv[2] || '')
 assert.ok(process.argv[2], 'A verified legacy installer is required')
 await access(legacy)
-const previous = await fetch('https://api.github.com/repos/arcnosixta/ciel-downloads/releases/tags/v1.0.13')
-assert.ok(previous.ok, 'Cannot verify the published legacy installer')
+const githubToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN
+const previous = await fetch('https://api.github.com/repos/arcnosixta/ciel-downloads/releases/tags/v1.0.13', {
+  headers: { Accept: 'application/vnd.github+json', ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}) },
+  signal: AbortSignal.timeout(30000),
+})
+assert.ok(previous.ok, `Cannot verify the published legacy installer (GitHub HTTP ${previous.status})`)
 const digest = (await previous.json()).assets.find(asset => asset.name === basename(legacy))?.digest
 const hash = createHash('sha256')
 for await (const chunk of createReadStream(legacy)) hash.update(chunk)
