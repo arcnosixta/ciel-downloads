@@ -72,7 +72,14 @@ jobs:
       - name: Download encrypted source from the unpublished release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download "v$CIEL_BUILD_VERSION" --repo "$GITHUB_REPOSITORY" --pattern build-input.enc.json --dir _build
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if gh release download "v$CIEL_BUILD_VERSION" --repo "$GITHUB_REPOSITORY" --pattern build-input.enc.json --dir _build --clobber; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then exit 1; fi
+            sleep 5
+          done
       - name: Authenticate and unpack build input
         env:
           CIEL_BUILD_INPUT_KEY: ${{ secrets[inputs.key_secret] }}
