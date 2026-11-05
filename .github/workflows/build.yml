@@ -88,8 +88,9 @@ jobs:
           const variables = process.platform === 'win32' ? ['TEMP', 'TMP'] : ['TMPDIR'];
           fs.appendFileSync(process.env.GITHUB_ENV, variables.map(name => `${name}=${temporary}\n`).join(''));
           if (process.platform === 'win32') {
-            const tools = path.join(process.env.SystemRoot, 'System32');
-            fs.accessSync(path.join(tools, 'tar.exe'));
+            const tools = path.join(temporary, 'ciel-native-archive-tools');
+            fs.mkdirSync(tools, { recursive: true });
+            fs.copyFileSync(path.join(process.env.SystemRoot, 'System32', 'tar.exe'), path.join(tools, 'tar.exe'));
             fs.appendFileSync(process.env.GITHUB_PATH, tools + '\n');
           }
           console.log('Canonical native temporary directory:', temporary);
