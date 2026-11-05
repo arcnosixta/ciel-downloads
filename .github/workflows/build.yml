@@ -31,7 +31,7 @@ jobs:
   build:
     permissions:
       contents: write
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -108,6 +108,14 @@ jobs:
         working-directory: _build/source/connector
       - run: npm run dist -- --${{ matrix.target }} --${{ matrix.arch }}
         working-directory: _build/source/connector
+      - name: Prepare sandboxed Electron UI checks on Linux
+        if: matrix.target == 'linux'
+        working-directory: _build/source
+        run: |
+          command -v xvfb-run
+          command -v xauth
+          sudo chown root:root connector/node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 connector/node_modules/electron/dist/chrome-sandbox
       - name: Verify packaged runtime and updater on the target machine
         run: node connector/smoke-packaged.mjs ${{ matrix.target == 'win' && '--unpacked' || '' }}
         working-directory: _build/source
