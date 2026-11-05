@@ -80,6 +80,20 @@ jobs:
           node scripts/build-input.cjs _build/build-input.enc.json _build/source.tar.gz
           tar -xzf _build/source.tar.gz -C _build/source
           node -e "require('node:assert/strict').equal(require('./_build/source/connector/package.json').version, process.env.CIEL_BUILD_VERSION)"
+      - name: Normalize native temporary paths and archive tools
+        run: |
+          node <<'JS'
+          const fs = require('node:fs'), path = require('node:path');
+          const temporary = fs.realpathSync(process.env.RUNNER_TEMP);
+          const variables = process.platform === 'win32' ? ['TEMP', 'TMP'] : ['TMPDIR'];
+          fs.appendFileSync(process.env.GITHUB_ENV, variables.map(name => `${name}=${temporary}\n`).join(''));
+          if (process.platform === 'win32') {
+            const tools = path.join(process.env.SystemRoot, 'System32');
+            fs.accessSync(path.join(tools, 'tar.exe'));
+            fs.appendFileSync(process.env.GITHUB_PATH, tools + '\n');
+          }
+          console.log('Canonical native temporary directory:', temporary);
+          JS
       - run: npm ci
         working-directory: _build/source
       - run: npm ci --ignore-scripts --no-audit --no-fund
