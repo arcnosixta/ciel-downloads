@@ -106,7 +106,16 @@ jobs:
       - run: npm run typecheck
         working-directory: _build/source
       - run: npm test
+        if: matrix.target != 'win'
         working-directory: _build/source
+      - name: Run Windows tests with native archive tools
+        if: matrix.target == 'win'
+        shell: pwsh
+        working-directory: _build/source
+        run: |
+          $env:Path = "$env:SystemRoot\System32;$env:Path"
+          npm.cmd test
+          exit $LASTEXITCODE
       - run: npm run build
         working-directory: _build/source
       - name: Prepare Windows runtime with native ZIP support
