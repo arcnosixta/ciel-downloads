@@ -150,6 +150,26 @@ jobs:
       - name: Verify packaged runtime and updater on the target machine
         run: node connector/smoke-packaged.mjs ${{ matrix.target == 'win' && '--unpacked' || '' }}
         working-directory: _build/source
+      - name: Verify opt-in video installation, capture and render from the Windows x64 package
+        if: matrix.target == 'win' && matrix.arch == 'x64'
+        shell: pwsh
+        working-directory: _build/source
+        run: |
+          $media = Join-Path $env:RUNNER_TEMP 'ciel-video-ci'
+          New-Item -ItemType Directory -Path $media | Out-Null
+          $archive = Join-Path $media 'ffmpeg.zip'
+          curl.exe --fail --location --retry 3 --silent --show-error --output $archive https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to fetch the pinned FFmpeg test dependency' }
+          $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash
+          if ($digest -ine '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba') { throw 'FFmpeg test dependency digest mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath $media
+          $env:CIEL_FFMPEG_BIN = Join-Path $media 'ffmpeg-9.0.2-essentials_build/bin/ffmpeg.exe'
+          $env:CIEL_FFPROBE_BIN = Join-Path $media 'ffmpeg-9.0.2-essentials_build/bin/ffprobe.exe'
+          $env:CIEL_CONNECTOR_RUNTIME_DIR = (Resolve-Path -LiteralPath 'connector/dist/win-unpacked/resources').Path
+          $env:CIEL_NODE_BIN = Join-Path $env:CIEL_CONNECTOR_RUNTIME_DIR 'tools/node/node.exe'
+          $env:CIEL_NPM_CLI = Join-Path $env:CIEL_CONNECTOR_RUNTIME_DIR 'tools/node/node_modules/npm/bin/npm-cli.js'
+          & $env:CIEL_NODE_BIN connector/smoke-video.mjs
+          exit $LASTEXITCODE
       - name: Verify Windows installer scope selection
         if: matrix.target == 'win'
         run: node --test test/installerScope.test.js
