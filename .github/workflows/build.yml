@@ -106,7 +106,12 @@ jobs:
         working-directory: _build/source
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: _build/source/server/capabilities
-      - run: npm ci
+      - name: Acquire the checksum-pinned native Electron release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node "$GITHUB_WORKSPACE/scripts/electron-runtime.mjs" prepare
+        working-directory: _build/source/connector
+      - run: node "$GITHUB_WORKSPACE/scripts/electron-runtime.mjs" npm ci
         working-directory: _build/source/connector
       - run: npm run lint
         working-directory: _build/source
@@ -125,6 +130,9 @@ jobs:
           exit $LASTEXITCODE
       - run: npm run build
         working-directory: _build/source
+      - name: Verify and cache pinned GitHub runtime dependencies
+        run: node "$GITHUB_WORKSPACE/scripts/prime-runtime.mjs"
+        working-directory: _build/source
       - name: Prepare Windows runtime with native ZIP support
         if: matrix.target == 'win'
         shell: pwsh
@@ -137,7 +145,10 @@ jobs:
         working-directory: _build/source
       - run: npm run test:runtime
         working-directory: _build/source/connector
-      - run: npm run dist -- --${{ matrix.target }} --${{ matrix.arch }}
+      - name: Build native installers with the verified Electron mirror
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node "$GITHUB_WORKSPACE/scripts/electron-runtime.mjs" npm run dist -- --${{ matrix.target }} --${{ matrix.arch }}
         working-directory: _build/source/connector
       - name: Prepare sandboxed Electron UI checks on Linux
         if: matrix.target == 'linux'
@@ -158,10 +169,8 @@ jobs:
           $media = Join-Path $env:RUNNER_TEMP 'ciel-video-ci'
           New-Item -ItemType Directory -Path $media | Out-Null
           $archive = Join-Path $media 'ffmpeg.zip'
-          curl.exe --fail --location --retry 3 --silent --show-error --output $archive https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip
+          node (Join-Path $env:GITHUB_WORKSPACE 'scripts/prime-runtime.mjs') --ffmpeg $archive
           if ($LASTEXITCODE -ne 0) { throw 'Failed to fetch the pinned FFmpeg test dependency' }
-          $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash
-          if ($digest -ine '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba') { throw 'FFmpeg test dependency digest mismatch' }
           Expand-Archive -LiteralPath $archive -DestinationPath $media
           $env:CIEL_FFMPEG_BIN = Join-Path $media 'ffmpeg-9.0.2-essentials_build/bin/ffmpeg.exe'
           $env:CIEL_FFPROBE_BIN = Join-Path $media 'ffmpeg-9.0.2-essentials_build/bin/ffprobe.exe'
