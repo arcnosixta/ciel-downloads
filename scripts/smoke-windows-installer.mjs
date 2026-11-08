@@ -13,6 +13,11 @@ const require = createRequire(import.meta.url)
 const { UUID } = require('builder-util-runtime')
 const asar = require('@electron/asar')
 const execute = promisify(execFile)
+const fileSha256 = async file => {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(file)) hash.update(chunk)
+  return hash.digest('hex')
+}
 assert.equal(process.platform, 'win32')
 assert.equal(process.env.GITHUB_ACTIONS, 'true', 'Installer tests require an isolated GitHub runner')
 const pkg = require('./package.json')
@@ -37,9 +42,7 @@ const previous = await fetch('https://api.github.com/repos/arcnosixta/ciel-downl
 })
 assert.ok(previous.ok, `Cannot verify the published legacy installer (GitHub HTTP ${previous.status})`)
 const digest = (await previous.json()).assets.find(asset => asset.name === basename(legacy))?.digest
-const hash = createHash('sha256')
-for await (const chunk of createReadStream(legacy)) hash.update(chunk)
-assert.equal(digest, 'sha256:' + hash.digest('hex'), 'Legacy installer checksum mismatch')
+assert.equal(digest, 'sha256:' + await fileSha256(legacy), 'Legacy installer checksum mismatch')
 const root = await mkdtemp(join(tmpdir(), 'ciel-installer-upgrade-'))
 let installed = ''
 const run = async (file, args) => {
@@ -56,6 +59,20 @@ const installedVersion = directory => {
   // Upgrades replace the archive at the same path; its old cached header is invalid.
   asar.uncache(archive)
   return JSON.parse(asar.extractFile(archive, 'package.json')).version
+}
+const verifyInstalledRuntime = async directory => {
+  const unpacked = resolve('connector/dist', process.arch === 'arm64' ? 'win-arm64-unpacked' : 'win-unpacked', 'resources')
+  for (const file of [
+    'workspace/workspace.html',
+    'server/start.js',
+    'opencode/opencode.exe',
+    'tools/opencode-sdk/package.json',
+    'tools/opencode-sdk/package-lock.json',
+    'tools/opencode-sdk/node_modules/@opencode-ai/plugin/package.json',
+  ]) {
+    assert.equal(await fileSha256(join(directory, 'resources', file)), await fileSha256(join(unpacked, file)), `Installed runtime file differs from packaged build: ${file}`)
+  }
+  console.log('Verified installed workspace, bridge, OpenCode and SDK match the packaged build')
 }
 let uninstallFailed = false
 const uninstall = async () => {
@@ -83,6 +100,7 @@ try {
   assert.ok(installed, 'Fresh one-click installation must select the current user')
   assert.equal(await location('HKLM'), '')
   assert.equal(installedVersion(installed), pkg.version)
+  await verifyInstalledRuntime(installed)
   console.log('Verified fresh per-user installation')
   await uninstall()
   for (const mode of ['currentuser', 'allusers']) {
